@@ -1,0 +1,54 @@
+
+# ==========================================
+# SLIDEFORGE AI - GITIGNORE
+# ==========================================
+
+# Zmienne środowiskowe i klucze API
+.env
+.env.*
+!.env.example
+
+# Środowiska wirtualne Python
+.venv/
+venv/
+env/
+
+# Cache Pythona
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Streamlit - lokalne ustawienia
+.streamlit/secrets.toml
+
+# Wygenerowane prezentacje
+output/
+*.pptx
+*.ppt
+
+# Wyjątek: szablony PowerPoint
+!templates/
+!templates/*.pptx
+
+# Pliki tymczasowe
+*.tmp
+*.bak
+*.log
+~$*
+
+# Pliki systemowe
+.DS_Store
+Thumbs.db
+
+# VS Code - lokalne ustawienia
+.vscode/
+
+# Lokalne kopie baz danych
+*.db
+*.sqlite
+*.sqlite3
