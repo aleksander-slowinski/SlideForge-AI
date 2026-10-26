@@ -1,4 +1,3 @@
-
 # ==========================================
 # SLIDEFORGE AI - GITIGNORE
 # ==========================================
@@ -28,8 +27,7 @@ htmlcov/
 
 # Wygenerowane prezentacje
 output/
-*.pptx
-*.ppt
+
 
 # Wyjątek: szablony PowerPoint
 !templates/
