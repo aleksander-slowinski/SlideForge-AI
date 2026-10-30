@@ -7,13 +7,18 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
+from google.genai import types
 
 from models.planner_schemas import PresentationPlanSchema
+from models.schemas import PresentationSchema
 from services.batch_content_service import (
     generate_batch,
     generate_content_from_plan,
 )
 
+from services.resumable_batch_service import (
+    generate_content_resumable,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "output"
@@ -58,7 +63,16 @@ api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
     raise ValueError("Brak GEMINI_API_KEY")
 
-client = genai.Client(api_key=api_key)
+
+client = genai.Client(
+    api_key=api_key,
+    http_options=types.HttpOptions(
+        retry_options=types.HttpRetryOptions(
+            attempts=1,
+        ),
+    ),
+)
+
 
 
 try:
@@ -96,11 +110,13 @@ try:
             flush=True,
         )
 
-        presentation = generate_content_from_plan(
+        presentation: PresentationSchema = generate_content_resumable(
             plan=plan,
             batch_size=4,
+            checkpoint_root=OUTPUT_DIR / "checkpoints",
             client=client,
         )
+
 
         output_file = (
             OUTPUT_DIR / "presentation_content.json"
