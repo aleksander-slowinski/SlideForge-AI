@@ -304,6 +304,30 @@ Tests include validation, presentation construction, checkpoint reuse/integrity,
 - Full live API validation for long decks and recovery after an actual mid-run outage remains pending.
 - The SQL/Power BI layer is optional and has been developed in a local environment.
 
+## Power BI Dashboard Gallery
+
+SlideForge Analytics provides operational and technical insights
+into presentation generation, AI performance, slide composition,
+and workflow reliability.
+
+### Operational Overview
+
+![SlideForge Operational Overview](screenshots/overview.png)
+
+### Generation Performance
+
+![AI Generation Performance](screenshots/generation_performance.png)
+
+### Additional Dashboards
+
+- [Slide Analysis](screenshots/slide_analysis.png)
+- [AI Reliability](screenshots/ai_reliability.png)
+
+The dashboards are based on local SQL Server telemetry.
+Synthetic test runs are distinguished from actual generation
+results, and Planned Generation metrics remain preliminary
+until full live API validation is completed.
+
 ## Roadmap
 
 1. Complete a live 12-slide and then 20–25-slide end-to-end validation of Planned Generation when the API is available.
