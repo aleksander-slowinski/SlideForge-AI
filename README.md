@@ -1,236 +1,316 @@
 # SlideForge AI
 
-### AI-Powered Presentation Generation & Quality Analytics
+### AI-Powered Presentation Generation, Resumable Workflows & Quality Analytics
 
-SlideForge AI is a Python application that turns a user-defined topic into an editable PowerPoint presentation using Google's Gemini API. It combines **structured LLM generation, Pydantic validation, deterministic slide rendering, and quality checks** with an optional SQL Server and Power BI analytics layer.
+SlideForge AI is a Python and Streamlit project that converts a topic or a structured outline into an **editable PowerPoint presentation**. It combines Google's Gemini API, Pydantic schemas, deterministic `python-pptx` rendering, a heuristic Quality Engine, and optional SQL Server / Power BI analytics.
 
-The project was developed as a practical exploration of how generative AI can be integrated into a controlled document-production workflow, rather than used as an unconstrained text generator.
+The central engineering goal is to make an LLM-driven document workflow **structured, inspectable, recoverable, and measurable**, rather than treating model output as a finished presentation.
 
-> **Project status:** v1.0 — stable presentation-generation workflow. The Presentation Planner and Batch Content Generator are experimental modules and are **not** part of the production Streamlit flow in this release.
+> **Version status**
+>
+> - **v1.0 — stable (`main`, tag `v1.0.0`):** Classic generation, Demo Mode, 11 layouts, schema validation, PowerPoint export, Quality Engine v2, and SQL telemetry.
+> - **v1.1 — in development (`feature/long-presentations`):** Planned Generation, resumable JSON checkpoints, bounded Gemini API retries, separate Streamlit page, and batch-level SQL telemetry.
+> - **Not yet validated end-to-end against the live API:** completion of a full multi-batch presentation. Recent attempts were blocked by Gemini HTTP `503` responses. The v1.1 workflow has been tested with simulated dependencies; this is not a claim of production reliability.
 
-## 📊 Project Overview
+## Project Overview
 
-Creating a structured presentation usually involves several separate tasks: outlining the topic, drafting concise content, selecting layouts, formatting slides, and reviewing the result. Generative AI can accelerate content creation, but its output is not automatically suitable for a PowerPoint file: it can produce inconsistent structures, overcrowded slides, and unpredictable formatting.
+Presentation production involves more than drafting slide text: it requires a coherent outline, layout selection, predictable data structures, consistent formatting, and review. LLM output may be malformed, too long, inconsistent between slides, or interrupted by API errors.
 
-SlideForge addresses this by separating **content generation** from **presentation rendering**. Gemini produces structured content, Pydantic verifies its shape, and Python renders it into a predefined PowerPoint template. A heuristic Quality Engine evaluates the resulting content, while telemetry makes the workflow measurable.
+SlideForge separates those concerns. **Gemini proposes structured content; Python validates, assembles, renders, and measures the result.** The planned-generation workflow extends this architecture to longer decks through smaller, independently validated batches that can be resumed after a failed request.
 
-## 🎯 Business Value & Use Case
+### Business Value
 
-The application is designed for repeatable creation of academic and business-style presentations from a topic and a requested slide count.
+- **Faster first drafts:** Turn a topic or prepared outline into a downloadable, editable `.pptx` file.
+- **Consistent presentation design:** Render native PowerPoint objects against a reusable template.
+- **Controlled AI output:** Validate slide layouts, fields, slide counts, numbering, and plan compatibility.
+- **Failure recovery:** Persist successful batches and avoid regenerating them after an interrupted run.
+- **Operational visibility:** Record performance, failures, token metadata where available, and slide quality for analysis in Power BI.
 
-- **Faster first drafts:** Generate an editable presentation instead of starting from an empty deck.
-- **Consistent formatting:** Render content into reusable slide layouts with a shared visual language.
-- **Controlled outputs:** Reject responses that violate the expected data structure or slide numbering.
-- **Quality visibility:** Surface readability and content-density warnings before the file is used.
-- **Operational observability:** Track generation success, execution time, model configuration, token usage, and quality metrics in SQL Server and Power BI.
+SlideForge is a **portfolio and demonstration project**. Generated material still requires human fact-checking and visual review.
 
-This is a **portfolio / demonstration project**, not a substitute for editorial review or factual verification.
+## Features and Validation Status
 
-## ✨ Core Features
+| Feature | Implementation | Status |
+|---|---|---|
+| Classic Generation | Topic-to-presentation workflow using Gemini and `PresentationSchema` | Stable v1.0 |
+| Demo Mode | Offline sample deck, without Gemini requests | Stable v1.0 |
+| 11 slide layouts | Layout-specific Pydantic models and editable PowerPoint shapes | Stable v1.0 |
+| Quality Engine v2 | Per-slide structural/density rules, scores and severity-coded issues | Stable v1.0 |
+| Presentation Planner | Generates a validated outline with sections, objectives and layout choices | Experimental; planner previously tested |
+| Planned Generation UI | Dedicated Streamlit page for loading a plan and inspecting batch state | Implemented and UI-tested |
+| Batch generation | Plan split into batches; output merged and checked against the plan | Unit/integration-tested with simulated responses |
+| Resume checkpoints | Atomic JSON writes, content hashes and configuration fingerprints | Unit-tested; live multi-batch recovery still pending |
+| API retry | Up to three attempts for HTTP `429` / `503`, with exponential backoff and jitter | Tested against real `503` responses |
+| Planned SQL telemetry | Per-run and per-batch events, API call counts and checkpoint hits | SQL integration and synthetic failure scenario tested |
+| Power BI analytics | Generation, slide composition, quality, failure and reliability reporting | Developed locally; report artifact may be separate from source repo |
 
-| Capability | Implementation |
+### Supported Slide Layouts
+
+| Layout | Intended use |
 |---|---|
-| **Gemini Mode** | Generates a presentation from a topic using a configurable Gemini API model and thinking level. |
-| **Demo Mode** | Builds a sample presentation without calling the Gemini API. |
-| **11 slide layouts** | Layout-specific Pydantic models and editable PowerPoint shapes. |
-| **Schema validation** | Enforces slide types, required fields, sequential numbering, and the requested slide count. |
-| **PowerPoint export** | Creates a `.pptx` file using `python-pptx` and a reusable template. |
-| **Quality Engine v2** | Assigns a heuristic score from 0 to 100 and reports issues by severity. |
-| **SQL Server telemetry** | Records generation status, per-slide metrics, quality results, execution timings, and available API usage data. |
-| **Power BI reporting** | Analyzes performance, reliability, slide layouts, errors, and quality trends. |
+| `title_content` | Bullet-point content |
+| `two_columns` | Parallel concepts or categories |
+| `comparison` | Side-by-side analysis |
+| `conclusion` | Main findings and recommendations |
+| `section_divider` | Section transitions |
+| `process_flow` | Ordered workflow steps |
+| `timeline` | Events and milestones |
+| `key_metrics` | Metrics with context and sources |
+| `case_study` | Problem, analysis, solution and outcome |
+| `quote_highlight` | Attributed quotation or key thesis |
+| `references` | Source entries and URLs |
 
-The main application supports **1–25 content slides**, with an additional title slide. Large decks may be more sensitive to model response size and latency; the full 25-slide range is not presented as a reliability guarantee.
+The schemas support **1–25 content slides**, plus a separately rendered title slide. This is a validation limit, **not** a guarantee that the Gemini API can generate every requested deck successfully.
 
-### Supported layouts
+## Architecture
 
-| Layout | Purpose |
-|---|---|
-| `title_content` | Standard content with bullet points |
-| `two_columns` | Parallel topics or grouped information |
-| `comparison` | Side-by-side comparison |
-| `conclusion` | Key findings and takeaways |
-| `section_divider` | Section transition |
-| `process_flow` | Ordered process or workflow |
-| `timeline` | Chronological events or stages |
-| `key_metrics` | Highlighted indicators and contextual notes |
-| `case_study` | Problem, analysis, solution, and outcome |
-| `quote_highlight` | Emphasized thesis or attributed quotation |
-| `references` | Reference entries and source links |
-
-## 🏗️ Technical Architecture
+### Classic Workflow — v1.0
 
 ```text
-User input (Streamlit)
-         |
-         v
-   Gemini API / Demo Mode
-         |
-         v
- PresentationSchema (Pydantic)
-         |
-         +------------------------+
-         |                        |
-         v                        v
-  Quality Engine v2       PowerPoint Renderer
-  Score + issues          python-pptx + template
-         |                        |
-         |                        v
-         |                  Editable .pptx
-         |
-         +------------+-----------+
-                      |
-                      v
-            SQL Server Telemetry
-                      |
-                      v
-               Power BI Reports
+Streamlit: Topic + Slide Count
+                |
+                v
+          Gemini API / Demo
+                |
+                v
+     PresentationSchema (Pydantic)
+                |
+         +------+-------+
+         |              |
+         v              v
+  Quality Engine v2   python-pptx + Template
+         |              |
+         +-------+------+ 
+                 |
+             PPTX + SQL Telemetry
+                       |
+                    Power BI
 ```
 
-**Design principle:** Gemini determines the content; the application determines the data contract, rendering rules, and analytics. The quality score describes structural and readability heuristics — **it does not establish factual or legal correctness**.
-
-### Main project modules
+### Planned Workflow — v1.1 (Experimental)
 
 ```text
-app.py                         # Streamlit UI
-prompt_builder.py              # LLM content instructions
-models/schemas.py              # Presentation and slide schemas
-services/llm_service.py        # Gemini integration
-services/presentation_service.py
-services/ppt_service.py        # PowerPoint orchestration
-services/quality_v2_service.py # Layout-aware quality checks
-services/generation_tracking_service.py
-services/telemetry_service.py
-services/db_service.py         # SQL Server connection
-services/generation_metrics.py # Timing and token metrics
-generators/                    # PowerPoint slide renderers
-templates/template.pptx        # Editable presentation template
-tests/                        # Automated tests
+Validated PresentationPlanSchema (JSON)
+                  |
+         Streamlit Plan Preview
+                  |
+         Divide into Slide Batches
+                  |
+       +----------+------------+
+       |                       |
+  Checkpoint HIT          Missing Batch
+       |                       |
+  Revalidate JSON         Gemini API
+       |                 (429/503 retry)
+       |                       |
+       |                Pydantic Validation
+       |                       |
+       |                Atomic JSON Checkpoint
+       +-----------+-----------+
+                   |
+        Merge + Validate Full Plan
+                   |
+      Render + Verify Editable PPTX
+                   |
+             Quality Engine v2
+                   |
+          SQL Run / Batch Telemetry
+                   |
+                Power BI
 ```
 
-The repository also includes experimental `planner_service.py`, `batch_content_service.py`, and related plan schemas. These explore outline-first, multi-request generation for longer presentations but are deliberately kept outside the v1.0 user workflow.
+**Important:** The v1.1 page currently **loads an existing JSON presentation plan**; it does not provide a complete plan-authoring interface. The planner is available separately through Python scripts.
 
-## 🧠 Engineering Challenges & Design Decisions
+## Engineering Decisions in v1.1
 
-### 1. Schema-first LLM generation
+### 1. Resumable, validated batches
 
-Rather than inserting unrestricted model text directly into slides, SlideForge validates the response against a Pydantic presentation model. Each of the 11 layouts has its own required content fields, reducing structural inconsistencies and enabling predictable downstream rendering.
+`services/resumable_batch_service.py` stores successfully generated batches in `output/checkpoints/`. A checkpoint is only saved **after schema and plan validation** and includes metadata and a SHA-256 content checksum.
 
-### 2. Editable, deterministic PowerPoint rendering
+The checkpoint directory is selected using a fingerprint of the plan and generation settings (including model, thinking level, batch size, instructions and pipeline revision). Reusing an incompatible or corrupted checkpoint is rejected instead of silently proceeding. Files are written through a temporary file and atomically replaced.
 
-The visual layer is implemented with `python-pptx` and a predefined template. Content is translated into native PowerPoint elements — including text boxes, cards, diagrams, and tables — instead of relying on screenshots of AI-generated slides. This keeps the exported deck editable.
+**Example:** If a 12-slide deck is split into batches of four and the third batch fails, the first two valid checkpoints can be reused on a subsequent attempt with the same configuration. A failed batch is not considered complete.
 
-### 3. Layout-aware Quality Engine
+### 2. Bounded retries for transient failures
 
-A single text-length threshold is insufficient for layouts with different visual capacities. Quality Engine v2 therefore evaluates content with **layout-specific heuristics** and returns an overall score, per-slide scores, and `INFO`, `WARNING`, or `ERROR` issues. The score helps identify likely presentation problems; it is not a semantic fact-checker.
+`services/api_retry_service.py` handles HTTP `429` and `503` with **three total attempts**, exponential backoff and a small random jitter. It does not retry validation problems, invalid configuration or unrelated errors. The internally owned Gemini client is configured to avoid duplicating retries already managed by the application.
 
-### 4. Fault-tolerant telemetry
+Retries **mitigate transient failures**; they cannot guarantee model availability. A failed batch remains resumable from the last valid checkpoint.
 
-SQL Server is used for observability, not as a prerequisite for creating a PowerPoint file. Generation tracking attempts to record starts, successes, failures, quality issues, and model metrics, while database failures are handled separately so that an otherwise valid presentation can still be produced.
+### 3. Separation from the stable Classic path
 
-### 5. Measuring the actual AI workflow
+Planned Generation runs on a separate Streamlit page (`pages/1_Planned_Generation.py`) and is orchestrated by dedicated service modules. The existing `app.py` and Classic generation path remain independent.
 
-The telemetry layer distinguishes the total generation duration from **Gemini API time, Pydantic validation time, and PPTX rendering time**. It also records the model, thinking level, and token metadata when the API supplies those values. This makes model comparisons more meaningful than looking at a single end-to-end average, especially because Demo Mode and Gemini Mode have very different execution profiles.
+### 4. Validation of the final artifact
 
-## 📈 SQL Server & Power BI Analytics
+Before a Planned run is marked successful, the application validates the assembled presentation against the outline, renders a temporary PPTX, checks that it is readable and contains the expected number of slides, evaluates content quality, and only then promotes the completed file.
 
-SlideForge stores analytical records in the `SlideForgeDB` database.
+The Quality Engine checks formatting-oriented heuristics, including slide-specific density and length rules. **It does not verify factual accuracy or legal compliance.**
 
-**Core tables**
+### 5. Observability without making SQL mandatory
 
-| Table | Purpose |
+The tracking layer tries to record each run and batch, but database write failures are handled separately. SQL Server is not required to render a PPTX. When token usage is unavailable — including some unsuccessful API calls — it is recorded as `NULL`, not inferred.
+
+## SQL Server and Power BI
+
+The optional analytics database is `SlideForgeDB`.
+
+| Table | Grain / purpose |
 |---|---|
-| `dbo.GenerationRun` | Generation status, mode, duration, model configuration, and token metrics |
-| `dbo.GeneratedSlide` | Slide-level layout and word-count metrics |
-| `dbo.GenerationQuality` | Quality score and severity counts per generation |
-| `dbo.QualityIssue` | Individual quality findings |
+| `dbo.GenerationRun` | One generation attempt; mode, strategy, status, duration, API metrics |
+| `dbo.GeneratedSlide` | One generated content slide; layout and word count |
+| `dbo.GenerationQuality` | Quality assessment for a successful generation |
+| `dbo.QualityIssue` | Individual Quality Engine findings |
+| `dbo.PlannedBatchExecution` | One batch within a Planned run; outcome, API calls, durations and optional tokens |
 
-**Reporting views:** `dbo.vw_GenerationAnalytics`, `dbo.vw_SlideAnalytics`, and `dbo.vw_QualityIssueAnalytics`.
+**Main reporting views:** `dbo.vw_GenerationAnalytics`, `dbo.vw_SlideAnalytics`, `dbo.vw_QualityIssueAnalytics`, and `dbo.vw_PlannedBatchAnalytics`.
 
-The Power BI report contains five analytical pages:
+The existing `GenerationMode` (`demo` / `gemini`) is distinct from the v1.1 **`GenerationStrategy`** (`classic` / `planned`). This prevents Demo runs from being mistaken for API-driven performance and supports future Classic-versus-Planned comparisons.
 
-- **Overview:** generation volume and overall success indicators.
-- **Generation Performance:** timing and AI usage metrics, including separate Demo and Gemini comparisons.
-- **Slide Analysis:** layout distribution and content volume.
-- **Error Analysis:** failed runs and reported error types.
-- **Quality Analytics:** Quality Score trends and issue breakdowns.
+### Dashboard Topics
 
-The database connection is optional for producing PPTX files. SQL Server Express and the relevant ODBC driver are required for local telemetry; the database objects must be provisioned before analytics can be used. The Power BI report is a separate local reporting artifact, not an embedded Streamlit dashboard.
+- **Overview** — run volume, status distribution and generation performance.
+- **Generation Performance** — Gemini execution times, failure rates and run-level diagnostics.
+- **Slide Analysis** — layout distribution, word counts and mode comparisons.
+- **Error Analysis** — failed requests and error categories.
+- **Quality Analytics** — heuristic quality scores and detected issues.
+- **AI Reliability (v1.1)** — Planned batch outcomes, retry/API-call counts and checkpoint reuse.
 
-## 🧰 Tech Stack
+The Power BI model should distinguish **synthetic test events** (marked with `[TEST]` and exposed as `IsTest`) from real run data. The v1.1 reliability page currently has limited observations; synthetic events demonstrate telemetry integration, **not measured production reliability**.
 
-| Layer | Technologies |
-|---|---|
-| Application | Python, Streamlit |
-| Generative AI | Google Gemini API (`google-genai`) |
-| Data contracts | Pydantic |
-| Presentation rendering | `python-pptx` |
-| Configuration | `python-dotenv` |
-| Persistence | Microsoft SQL Server, `pyodbc`, Microsoft ODBC Driver |
-| Analytics | Power BI Desktop, DAX |
-| Testing | `pytest` |
+## Repository Structure
 
-## 🚀 Running Locally
+```text
+app.py                                 # Stable Classic Streamlit entrypoint
+pages/1_Planned_Generation.py          # Experimental v1.1 Streamlit page
+models/schemas.py                      # Presentation / slide data contracts
+models/planner_schemas.py              # Outline schemas
+services/planner_service.py            # Outline generation
+services/batch_content_service.py      # Batch prompts and content generation
+services/resumable_batch_service.py    # Checkpoint store + resume orchestration
+services/api_retry_service.py          # Bounded API retries
+services/planned_presentation_service.py # Plan/PPTX orchestration
+services/planned_tracking_service.py   # Run and batch measurement
+services/planned_telemetry_service.py  # Planned SQL writes
+services/telemetry_service.py          # Existing Classic SQL telemetry
+services/quality_v2_service.py         # Quality Engine v2
+services/ppt_service.py                # Editable PowerPoint rendering
+generators/                            # Individual slide layout renderers
+templates/template.pptx                # PowerPoint template
+dev_test_planner.py                     # Creates a sample presentation plan (uses API)
+dev_test_batches.py                     # Experimental batch test (uses API)
+scripts/dev_test_planned_sql.py         # Synthetic SQL test without Gemini
+tests/                                  # Automated tests
+sql/                                    # SQL migrations / analytics objects
+output/                                 # Local results + checkpoints (Git-ignored)
+```
 
-The project was developed and tested in a **Windows / Python environment** with a local SQL Server Express instance. Other environments may require driver or path adjustments.
+## Run Locally
 
-### 1. Clone and set up the environment
+The project was developed on Windows with Python 3.13. SQL Server Express is optional for generating presentations; it is needed for the database-backed analytics workflow.
+
+### 1. Clone and choose a version
 
 ```powershell
 git clone https://github.com/aleksander-slowinski/slideforge-ai.git
 cd slideforge-ai
+
+# v1.1 development branch, not the stable v1.0 release:
+git switch feature/long-presentations
+
 py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 
-If PowerShell blocks virtual-environment activation, you can run commands through `.\.venv\Scripts\python.exe` without activating it.
+If PowerShell blocks activation, run commands with `.\.venv\Scripts\python.exe` directly. For automated tests, install `pytest` if not already present. For SQL telemetry, install `pyodbc` and the appropriate Microsoft ODBC Driver separately.
 
-### 2. Configure the environment
+### 2. Configure environment variables
 
-Create a local `.env` file (or copy `.env.example` if available):
+Copy `.env.example` to `.env` and fill in your local settings:
 
 ```dotenv
 GEMINI_API_KEY=your_api_key_here
 GEMINI_MODEL=your_available_gemini_model
 GEMINI_THINKING_LEVEL=medium
 
-# Optional SQL Server telemetry
+# Optional local SQL Server telemetry
 SQL_SERVER=.\SQLEXPRESS
 SQL_DATABASE=SlideForgeDB
 SQL_DRIVER=ODBC Driver 17 for SQL Server
 ```
 
-Replace the example model name with a model available to your API key. **Never commit `.env` or API credentials.** API usage may incur costs independently of a consumer Gemini subscription.
+Never commit `.env`, API keys or local checkpoint contents. Model availability and API pricing depend on the provider and account configuration.
 
-### 3. Start the application
+### 3. Start Streamlit
 
 ```powershell
 python -m streamlit run app.py
 ```
 
-Select **Demo Mode** to test the application without a Gemini request, or **Gemini API** to generate content from your own topic. Download the resulting editable PowerPoint file from Streamlit.
+- **Classic / Demo:** Use the original application workflow.
+- **Planned Generation:** Open the separate page in the Streamlit navigation. Load `output/presentation_plan.json` or upload a valid plan JSON, inspect the sections and checkpoints, then explicitly start generation.
 
-### 4. Run the test suite
+Browsing a plan or its checkpoint status does **not** call Gemini. Clicking **Generate / Resume** does.
+
+### 4. Prepare a plan for Planned Generation
+
+The development helper `dev_test_planner.py` creates a **specific demonstration outline** and writes it to `output/presentation_plan.json`. It **calls Gemini**, so it requires working API access:
 
 ```powershell
-python -m pytest -v
+python dev_test_planner.py
 ```
 
-Automated tests cover presentation schemas, layout rendering, quality rules, and generation tracking. The repository also contains separate development scripts for experimenting with presentation planning and batch generation.
+Alternatively, provide a `PresentationPlanSchema`-compatible JSON file through the Planned Generation page. The schema includes `topic`, `presentation_type`, `slides_count`, `sections` and `slides` with slide objectives and content briefs.
 
-## 🔐 Security & Limitations
+For direct batch testing (also requires API access):
 
-- **Generated content requires human review.** Gemini may produce inaccurate statements, unsupported statistics, or fabricated references.
-- **Quality Score is heuristic**, measuring selected structural and density rules rather than accuracy or visual perfection.
-- **Topics are stored in generation telemetry** when SQL logging is available. Avoid entering confidential or personally identifiable information in the presentation topic.
-- **Model availability, latency, usage limits, and API costs** are controlled by the Gemini API provider and can change over time.
-- **Long presentations** may exceed practical model output or latency constraints even when their requested slide count passes schema validation.
-- **Planner and Batch Generator are experimental**, not part of the supported v1.0 Streamlit workflow.
+```powershell
+python dev_test_batches.py --full
+```
 
-## 🛣️ Future Development
+Completed checkpoint files remain in `output/checkpoints/` for compatible reruns.
 
-Potential post-v1.0 extensions include an editable presentation outline, reliable section-based generation for longer decks, persistence and resumption of completed batches, and source-grounded factual verification. These are **not required to run the released version**.
+### 5. Optional SQL telemetry
+
+Set up the base `SlideForgeDB` tables, then apply the **corrected** Planned Generation schema migration (see `sql/` and project migration notes). Existing Classic records should remain intact; new Planned runs use `GenerationStrategy='planned'`.
+
+For a SQL-only smoke test that does not call Gemini:
+
+```powershell
+python -m scripts.dev_test_planned_sql
+```
+
+This inserts a clearly labeled **synthetic failed run** for checking SQL and Power BI. Do not interpret it as a real API reliability measurement.
+
+### 6. Automated tests
+
+```powershell
+python -m pip install pytest
+python -m pytest -q
+```
+
+Tests include validation, presentation construction, checkpoint reuse/integrity, retry behavior and Planned orchestration with mocked dependencies. A passing offline suite does not replace a live multi-batch end-to-end test.
+
+## Security and Limitations
+
+- Generated slides may contain inaccuracies, unsupported statements or invented references; review before use.
+- SQL telemetry records the presentation **topic**. Do not enter sensitive or personally identifying information in topics or documents intended for logging.
+- `output/` contains local generation results and checkpoint JSON; it is excluded from version control. Checkpoints are recoverable intermediate artifacts, not encrypted or anonymized storage.
+- LLM response latency, availability, rate limits and billing are outside the application's control.
+- Checkpoint reuse depends on an unchanged compatible plan and configuration; incompatible/corrupt files stop the process rather than being silently reused.
+- API retry counts reflect application/SDK calls as instrumented; token counts for unsuccessful requests may be unknown.
+- Planned Generation currently consumes a plan created or supplied separately; it is not a complete no-code outline editor.
+- Full live API validation for long decks and recovery after an actual mid-run outage remains pending.
+- The SQL/Power BI layer is optional and has been developed in a local environment.
+
+## Roadmap
+
+1. Complete a live 12-slide and then 20–25-slide end-to-end validation of Planned Generation when the API is available.
+2. Verify mid-run checkpoint resume against real API interruption and compare it with mocked integration tests.
+3. Expand the Power BI comparison of Classic versus Planned with more real observations; publish sanitized dashboard screenshots.
+4. Consider a UI flow for creating and editing presentation plans without a separate development script.
 
 ---
 
-**SlideForge AI v1.0** — a portfolio project demonstrating practical integration of generative AI, structured data validation, document generation, software testing, SQL telemetry, and business intelligence.
+**SlideForge AI** demonstrates schema-first generative AI, native document rendering, recoverable batch execution, controlled API retries, SQL observability and Business Intelligence — with a stable v1.0 baseline and an experimental v1.1 extension.
