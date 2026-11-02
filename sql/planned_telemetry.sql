@@ -2,22 +2,30 @@ USE SlideForgeDB;
 GO
 
 -- SlideForge 1.1: preserves GenerationMode ('gemini'/'demo') and all classic rows.
-IF COL_LENGTH('dbo.GenerationRun','GenerationStrategy') IS NULL
+IF COL_LENGTH(
+    'dbo.GenerationRun',
+    'GenerationStrategy'
+) IS NULL
 BEGIN
-    ALTER TABLE dbo.GenerationRun ADD GenerationStrategy VARCHAR(16) NOT NULL
-        CONSTRAINT DF_GenerationRun_GenerationStrategy DEFAULT ('classic');
-    ALTER TABLE dbo.GenerationRun ADD CONSTRAINT CK_GenerationRun_GenerationStrategy
-        CHECK (GenerationStrategy IN ('classic','planned'));
+    ALTER TABLE dbo.GenerationRun
+    ADD GenerationStrategy VARCHAR(16) NOT NULL
+        CONSTRAINT DF_GenerationRun_GenerationStrategy
+        DEFAULT ('classic');
 END;
 GO
-IF COL_LENGTH('dbo.GenerationRun','CheckpointFingerprint') IS NULL
-    ALTER TABLE dbo.GenerationRun ADD CheckpointFingerprint CHAR(64) NULL;
-IF COL_LENGTH('dbo.GenerationRun','BatchSize') IS NULL
-    ALTER TABLE dbo.GenerationRun ADD BatchSize INT NULL;
-IF COL_LENGTH('dbo.GenerationRun','ApiCallCount') IS NULL
-    ALTER TABLE dbo.GenerationRun ADD ApiCallCount INT NULL;
-IF COL_LENGTH('dbo.GenerationRun','CheckpointHitCount') IS NULL
-    ALTER TABLE dbo.GenerationRun ADD CheckpointHitCount INT NULL;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.check_constraints
+    WHERE name = 'CK_GenerationRun_GenerationStrategy'
+      AND parent_object_id = OBJECT_ID('dbo.GenerationRun')
+)
+BEGIN
+    ALTER TABLE dbo.GenerationRun
+    ADD CONSTRAINT CK_GenerationRun_GenerationStrategy
+        CHECK (GenerationStrategy IN ('classic', 'planned'));
+END;
+
 GO
 
 IF OBJECT_ID('dbo.PlannedBatchExecution','U') IS NULL
