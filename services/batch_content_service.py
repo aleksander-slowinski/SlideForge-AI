@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import errors, types
 
+from pydantic import ValidationError
+
 from models.planner_schemas import (
     PresentationPlanSchema,
     PlannedSlide,
@@ -58,6 +60,27 @@ TRYB GENEROWANIA PARTII SLIDEFORGE:
 - Pisz po polsku, zwięźle i rzeczowo.
 - Unikaj przeładowania slajdów tekstem.
 - Uwzględniaj notatki prelegenta.
+
+
+OGRANICZENIA DŁUGOŚCI:
+
+- Wszystkie pola tekstowe muszą spełniać
+  ograniczenia schematu Pydantic.
+
+- Dla layoutu timeline:
+  * period: maksymalnie 25 znaków
+  * heading: maksymalnie 40 znaków
+  * description: maksymalnie 90 znaków
+
+- Dla layoutu process_flow:
+  * heading: maksymalnie 40 znaków
+  * description: maksymalnie 100 znaków
+
+- Preferuj krótkie, kompletne zdania.
+- Nie przekraczaj limitów długości pól.
+- Dodatkowe wyjaśnienia umieszczaj
+  w speaker_notes.
+
 
 RZETELNOŚĆ:
 - Nie wymyślaj statystyk ani źródeł.
@@ -195,6 +218,72 @@ def _build_batch_prompt(
         "pól objective ani content_brief."
     )
 
+def validate_or_repair_batch_response(
+    raw_json: str,
+    *,
+    client,
+    model_name: str,
+    config,
+) -> PresentationSchema:
+    """Validate JSON and attempt one targeted repair."""
+
+    try:
+        return PresentationSchema.model_validate_json(raw_json)
+
+    except ValidationError as exc:
+        issues = [
+            {
+                "field": ".".join(
+                    str(part) for part in error["loc"]
+                ),
+                "message": error["msg"],
+            }
+            for error in exc.errors()
+        ]
+
+        logger.warning(
+            "Gemini JSON validation failed: %s",
+            issues,
+        )
+
+        repair_prompt = (
+            "Popraw poniższy JSON, aby spełniał "
+            "wymagania schematu prezentacji.\n\n"
+            "ZASADY:\n"
+            "- Popraw wyłącznie błędne pola.\n"
+            "- Zachowaj znaczenie merytoryczne.\n"
+            "- Zachowaj tytuły, layouty, numerację "
+            "i liczbę slajdów.\n"
+            "- Zachowaj pozostałe pola bez zmian.\n"
+            "- Nie ucinaj zdań w połowie.\n"
+            "- Zwróć wyłącznie poprawny JSON.\n\n"
+            "BŁĘDY WALIDACJI:\n"
+            f"{json.dumps(issues, ensure_ascii=False)}\n\n"
+            "ORYGINALNY JSON:\n"
+            f"{raw_json}"
+        )
+
+        try:
+            repaired = client.models.generate_content(
+                model=model_name,
+                contents=repair_prompt,
+                config=config,
+            )
+        except errors.APIError as api_exc:
+            raise RuntimeError(
+                "Gemini Content Repair: "
+                f"błąd API ({api_exc.code})."
+            ) from api_exc
+
+        if not repaired.text:
+            raise ValueError(
+                "Gemini Content Repair zwrócił pustą odpowiedź."
+            )
+
+        return PresentationSchema.model_validate_json(
+            repaired.text
+        )
+
 
 def generate_batch(
     plan: PresentationPlanSchema,
@@ -294,9 +383,13 @@ def generate_batch(
 
     # Pierwsza bariera walidacji:
     # kompletna struktura każdego layoutu.
-    result = PresentationSchema.model_validate_json(
-        response.text
-    )
+    result = validate_or_repair_batch_response(
+    response.text,
+    client=client,
+    model_name=model_name,
+    config=config,
+)
+
 
     if result.slides_count != len(batch):
         raise ValueError(
