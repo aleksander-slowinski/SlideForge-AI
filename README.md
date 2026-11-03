@@ -6,7 +6,7 @@ SlideForge AI is a Python/Streamlit application that turns a topic or a structur
 
 The project's central challenge is not simply asking an LLM to write slides. It is building a **repeatable, measurable process that can validate structured output, recover from failures, and avoid repeating completed work**.
 
-> **Project status — v1.1 portfolio release candidate**  
+> **Project status — v1.1 portfolio release**  
 > **v1.0:** Classic/Demo presentation generation (tagged `v1.0.0`).  
 > **v1.1:** Planned Generation, resumable batches, bounded API retries, validation-aware Content Repair, and batch-level telemetry. The latest development is on [`feature/long-presentations`](https://github.com/aleksander-slowinski/slideforge-ai/tree/feature/long-presentations).  
 > **Verified:** One complete **12-content-slide** Planned run using the live Gemini API, including successful reuse of checkpoints from an earlier failed run. **79 automated tests passed locally** on November 3, 2026.  
