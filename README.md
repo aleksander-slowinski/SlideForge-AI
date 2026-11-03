@@ -8,7 +8,8 @@ The project's central challenge is not simply asking an LLM to write slides. It 
 
 > **Project status — v1.1 portfolio release**  
 > **v1.0:** Classic/Demo presentation generation (tagged `v1.0.0`).  
-> **v1.1:** Planned Generation, resumable batches, bounded API retries, validation-aware Content Repair, and batch-level telemetry. The latest development is on [`feature/long-presentations`](https://github.com/aleksander-slowinski/slideforge-ai/tree/feature/long-presentations).  
+> **v1.1:** Planned Generation, resumable batches, bounded API retries, validation-aware Content Repair, and batch-level SQL telemetry. Available on `main`
+and tagged as `v1.1.0`.
 > **Verified:** One complete **12-content-slide** Planned run using the live Gemini API, including successful reuse of checkpoints from an earlier failed run. **79 automated tests passed locally** on November 3, 2026.  
 > **Scope:** This is a portfolio prototype, not a production-grade or legally authoritative presentation service. Longer 20–25-slide end-to-end runs and live Content Repair behavior require further validation.
 
@@ -187,8 +188,6 @@ The project was developed on **Windows / Python 3.13**. It requires a Gemini API
 git clone https://github.com/aleksander-slowinski/slideforge-ai.git
 cd slideforge-ai
 
-# Use the v1.1 development branch until it is merged into main:
-git switch feature/long-presentations
 
 py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
