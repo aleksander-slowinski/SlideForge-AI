@@ -82,7 +82,7 @@ for section in plan.sections:
         st.dataframe(
             [{"Nr": s.slide_number, "Tytuł": s.title, "Layout": s.layout.value}
              for s in slides],
-            use_container_width=True, hide_index=True,
+            width='stretch', hide_index=True,
         )
 
 st.subheader("Stan checkpointów")
